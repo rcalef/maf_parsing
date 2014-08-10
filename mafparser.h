@@ -1,7 +1,12 @@
 #ifndef __MAFPARSER_H
 #define __MAFPARSER_H
 
+#include <search.h>
+
 #define BUFSIZE 50000
+
+typedef struct hsearch_data *hash;
+
 typedef struct array_parser{
         FILE *maf_file;
         char *filename;
@@ -39,6 +44,17 @@ typedef struct _alignment_block{
         int curr_seq;
 }*alignment_block;
 
+typedef struct _hash_alignment_block{
+        double score;
+        int pass;
+        char *data;
+	int size;
+        int max;
+	char **species;
+	hash sequences;
+}*hash_alignment_block;
+
+
 int get_next_offset(maf_array_parser parser);
 seq get_sequence(char *data);
 seq copy_sequence(seq sequence);
@@ -46,6 +62,7 @@ seq copy_sequence(seq sequence);
 alignment_block array_next_alignment(maf_array_parser parser);
 alignment_block linear_next_alignment(maf_linear_parser parser);
 alignment_block linear_next_alignment_buffer(maf_linear_parser parser);
+hash_alignment_block get_next_alignment_hash(maf_linear_parser parser);
 void array_double(maf_array_parser parser);
 
 maf_array_parser get_array_parser(FILE *maf_file,char *filename);
@@ -54,7 +71,9 @@ void free_array_parser(maf_array_parser parser);
 void free_linear_parser(maf_linear_parser parser);
 void free_sequence(seq sequence);
 void free_alignment_block(alignment_block aln);
+void free_hash_alignment(hash_alignment_block aln);
 
 void print_sequence(seq sequence);
 void print_alignment(alignment_block aln);
+void print_hash_alignment(hash_alignment_block aln);
 #endif

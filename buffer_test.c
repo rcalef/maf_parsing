@@ -20,12 +20,15 @@ int main(int argc, char **argv){
                 return 1;
         }
         maf_linear_parser parser = get_linear_parser(maf_file,filename);
-        while(1){
+//        while(1){
            alignment_block aln = linear_next_alignment_buffer(parser);
-           if(aln==NULL)break;
+//           if(aln==NULL)break;
            print_alignment(aln);
            free_alignment_block(aln);
-        }
+//        }
+        hash_alignment_block haln=get_next_alignment_hash(parser);
+	print_hash_alignment(haln);
+	free_hash_alignment(haln);
         free_linear_parser(parser);
         fclose(maf_file);
         end=clock();

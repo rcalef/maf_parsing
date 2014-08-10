@@ -5,11 +5,9 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include <search.h>
 
 #include "mafparser.h"
 
-typedef struct hsearch_data *hash;
 
 char **in_group;
 int in_size;

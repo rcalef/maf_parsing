@@ -96,7 +96,7 @@ int main(int argc, char **argv){
         while(1){
            alignment_block aln = linear_next_alignment_buffer(parser);
            if(aln==NULL)break;
-           print_alignment(aln);
+//           print_alignment(aln);
            species_filter(aln,species,num_species);
            print_alignment(aln);
 	   print_pairwise_distances(aln);
