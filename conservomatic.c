@@ -14,7 +14,13 @@ typedef struct _genome{
    int max_scaffolds;
    hash scaffolds;
    char *species;
+   char **scaffold_names;
 }*genome;
+
+typedef struct _scaffold{
+   unsigned int length;
+   char *sequence;
+}*scaffold;
 
 
 char **in_group;
@@ -29,6 +35,13 @@ int genomes_size;
 int genomes_max;
 hash genomes;
 
+void free_genome(genome gen){
+   if(gen == NULL) return;
+   
+   free(gen->species);
+   free(gen);
+}
+
 int get_largest(int *nums, int size){
    int max = 0;
    for(int i =0; i < size; ++i) 
@@ -36,13 +49,15 @@ int get_largest(int *nums, int size){
    return max;
 }
 
-void search_hash(char *key, ENTRY *ret_val, hash table){
+ENTRY *search_hash(char *key, ENTRY *ret_val, hash table){
          ENTRY search={key,NULL};
          int hc = hsearch_r(search,FIND,&ret_val,table);
          if(hc == 0){
+            if(errno == 3) return NULL;
             fprintf(stderr,"Error searching hash table: %s\n", strerror(errno));
             exit(1);
          }
+         return ret_val;
 }
 
 
@@ -152,17 +167,22 @@ void parse_args(int argc, char **argv){
 
 void process_block(sorted_alignment_block aln){
    int counts[5] = {0};
-   int itor =0;
+   int itor;
    int hc = 0;
-   int num_found = 0;
-   double in_score = 0.0;
-   double out_score = 0.0;
+   int num_found;
+   double in_score;
+   double out_score;
    ENTRY *ret_val;
    char c;
    char cons_string[aln->seq_length];
-   memset(cons_string,0,aln->seq_length*sizeof(char));
+//   memset(cons_string,0,aln->seq_length*sizeof(int));
 //Check conservation base by base, starting with in group species.
    for(unsigned int base = 0; base < aln->seq_length; ++base){
+      itor=0;
+      num_found=0;
+      memset(counts,0,sizeof(counts));
+      in_score=0.0;
+      out_score=0.0;
       for(;itor < aln->in_size;++itor){
          c=toupper(aln->in_sequences[itor]->sequence[base]);
          switch(c){
@@ -191,7 +211,10 @@ void process_block(sorted_alignment_block aln){
 //number of observed bases is below threshold, if so, continue, leaving
 //the already written 0 untouched.
       in_score=((double)get_largest(counts,5))/num_found;
-      if(in_score < cons_thresh) continue; 
+      if(in_score < cons_thresh){
+         cons_string[base]='0'; 
+         continue;
+      }
 //If in_score passes threshold, then check conservation in out group.
       itor = 0;
       num_found = 0;
@@ -221,59 +244,72 @@ void process_block(sorted_alignment_block aln){
          ++num_found;
       }
       out_score=((double)get_largest(counts,5))/num_found;
-      if(out_score < cons_thresh) cons_string[base]=1;
-      else cons_string[base]=2;
+      if(out_score < cons_thresh) cons_string[base]='1';
+      else cons_string[base]='2';
    }  
 //Now that we have the completed conservation string, we can add it
 //to the appropriate scaffold in the corresponding genome.
-   char *scaffold_name;
-   char *temp;
-   for(itor=0; itor < genomes_size; ++itor){
-//First check if species was in alignment block.
-//      ENTRY search={genome_names[itor],NULL};
-//      hc=hsearch_r(search,FIND,&ret_val,aln->sequences);
-//      if(hc == 0){
-//         fprintf(stderr,"Error searching hash table: %s\n", strerror(errno));
-//         exit(1);
-//      }
-      search_hash(genome_names[itor],ret_val,aln->sequences);
-      if(ret_val == NULL) continue;
-      seq curr_seq = ret_val->data;
-//If species was present, get scaffold name and genome struct.
-//      hc=hsearch_r(search,FIND,&ret_val,genomes);
-//      if(hc == 0){
-//         fprintf(stderr,"Error searching hash table: %s\n", strerror(errno));
-//         exit(1);
-//      }
-      search_hash(genome_names[itor],ret_val,genomes);
+   for(itor=0; itor < aln->in_size; ++itor){
+//First check if species genome is being outputted.
+//If not, continue.
+      if(!in_list(aln->in_sequences[itor]->species,genome_names,
+             genomes_size)) continue;
+//If so, get scaffold name and genome struct.
+      ret_val=search_hash(aln->in_sequences[itor]->species,ret_val,genomes);
       genome curr_gen = ret_val->data;
-      temp = strdup(((seq)ret_val->data)->src);
-      scaffold_name=strtok(temp,".");
-      scaffold_name=strtok(NULL,".");
-      printf("Scaffold name: %s\n",scaffold_name);
+      printf("Scaffold name: %s\n",aln->in_sequences[itor]->scaffold);
 //Check if scaffold is in species genome struct already.
-//      search.key=scaffold_name;
-//      hc=hsearch_r(search,FIND,&ret_val,curr_gen->scaffolds);
-//      if(hc == 0){
-//         fprintf(stderr,"Error searching hash table: %s\n", strerror(errno));
-//         exit(1);
-//      }
-      search_hash(scaffold_name,ret_val,curr_gen->scaffolds);
+      ret_val=search_hash(aln->in_sequences[itor]->scaffold,ret_val,curr_gen->scaffolds);
 //If ret_val is NULL, need to add entry for this scaffold
       if(ret_val == NULL){
-         char *scaffold_stream =  calloc(1,sizeof(char)*curr_seq->srcSize);
-         assert(scaffold_stream != NULL);
-         ENTRY search={scaffold_name,scaffold_stream};
+         if(curr_gen->num_scaffolds >= curr_gen->max_scaffolds){
+            fprintf(stderr, "WARNING: Scaffold hash table over half full"
+                            "consider increasing max alignment hash size"
+                            " to avoid decreased performance or crashes.\n"
+                            "Species: %s\nCurrent size: %d\nMax size: %d\n"
+                            ,curr_gen->species,curr_gen->num_scaffolds
+                            ,curr_gen->max_scaffolds);
+         }
+         scaffold new_scaf= malloc(sizeof(struct _scaffold *));
+         assert(new_scaf != NULL);
+         new_scaf->length = aln->in_sequences[itor]->srcSize;
+         new_scaf->sequence =  calloc(1,sizeof(char)*new_scaf->length);
+         assert(new_scaf->sequence != NULL);
+         ENTRY search={strdup(aln->in_sequences[itor]->scaffold),new_scaf};
+	 assert(search.key != NULL);
          hc=hsearch_r(search,ENTER,&ret_val,curr_gen->scaffolds);
          if(hc == 0){
-            fprintf(stderr,"Error searching hash table: %s\n", strerror(errno));
+            fprintf(stderr,"Error inserting into hash table: %s\n", strerror(errno));
             exit(1);
          }
+         curr_gen->scaffold_names[curr_gen->num_scaffolds++]=
+               strdup(aln->in_sequences[itor]->scaffold);
+         assert(curr_gen->scaffold_names[curr_gen->num_scaffolds-1] != NULL);
       }
 //If scaffold entry already present, or after inserting new entry,
 //write to scaffold stream in appropriate position.
-      unsigned int insert_pos = curr_seq->start;
-      strcpy(((char*)ret_val->data)[insert_pos],cons_string);
+      unsigned int insert_pos = aln->in_sequences[itor]->start;
+      strcpy(((scaffold)ret_val->data)->sequence+(insert_pos-1),cons_string);
+
+   }
+}
+
+void print_genomes(){
+   ENTRY *ret_val;
+   for(int i = 0; i < genomes_size; ++i){
+      printf("For species %s:\n",genome_names[i]);
+      ret_val=search_hash(genome_names[i], ret_val,genomes);
+      genome curr_gen = ret_val->data;
+      for(int j = 0; j < curr_gen->num_scaffolds; ++j){
+           ret_val=search_hash(curr_gen->scaffold_names[j],ret_val,curr_gen->scaffolds);
+           printf(">%s.%s   \n",genome_names[i],ret_val->key);
+           char *sequence = ((scaffold)ret_val->data)->sequence;
+           for(unsigned int k = 0; k < ((scaffold)ret_val->data)->length; ++k){
+              if(k==100)printf("\n");
+              printf("%c",sequence[k]);
+           }
+           printf("\n");
+      }
    }
 }
 
@@ -293,6 +329,12 @@ int main(int argc, char **argv){
       exit(1);
    }
    char *filename = argv[optind];
+   FILE *maf_file;
+   if((maf_file= fopen(filename, "rb")) == NULL){
+      fprintf(stderr, "Unable to open file: %s\nError: %s",
+         filename,strerror(errno));
+      return 1;
+   }
 //   for(int i = 0; i < in_size; ++i) printf("%s\n", in_group[i]);
 //  for(int i = 0; i < out_size; ++i) printf("%s\n", out_group[i]);
 //  for(int i = 0; i < genomes_size; ++i) printf("%s\n", genome_names[i]);
@@ -311,6 +353,8 @@ int main(int argc, char **argv){
        assert(new_gen != NULL);
        new_gen->num_scaffolds=0;
        new_gen->max_scaffolds=128;
+       new_gen->scaffold_names = malloc(sizeof(char*) * 256);
+       assert(new_gen->scaffold_names != NULL);
        new_gen->species = genome_names[i];
        new_gen->scaffolds = calloc(1,sizeof(struct hsearch_data));
        assert(new_gen->scaffolds != NULL);
@@ -328,24 +372,27 @@ int main(int argc, char **argv){
         }
        printf("Entry inserted: %s\n", genome_names[i]);
    }
-	   
-   FILE *maf_file;
-   if((maf_file= fopen(filename, "rb")) == NULL){
-      fprintf(stderr, "Unable to open file: %s\nError: %s",
-         filename,strerror(errno));
-      return 1;
-   }
    maf_linear_parser parser = get_linear_parser(maf_file,filename);
    while(1){
       sorted_alignment_block aln = get_sorted_alignment(parser,in_group
                   ,in_size,out_group,out_size);
       if(aln==NULL)break;
-           print_sorted_alignment(aln);
-           process_block(aln);
-           free_sorted_alignment(aln);
-        }
-        free_linear_parser(parser);
-        fclose(maf_file);
-        return 0;
+      print_sorted_alignment(aln);
+      process_block(aln);
+      free_sorted_alignment(aln);
+   }
+   print_genomes();
+/*   for(int i = 0; i < genomes_size; ++i){
+      printf("For species %s:\n",genome_names[i]);
+      ret_val=search_hash(genome_names[i], ret_val,genomes);
+      genome curr_gen = ret_val->data;
+      for(int j = 0; j < curr_gen->num_scaffolds; ++j){
+           ret_val=search_hash(curr_gen->scaffold_names[j],ret_val,curr_gen->scaffolds);
+           printf("\t%s   %s\n",ret_val->key,(char *)ret_val->data);
+      }
+   }*/
+   free_linear_parser(parser);
+   fclose(maf_file);
+   return 0;
 }
 
