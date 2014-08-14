@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <getopt.h>
 
 #include "mafparser.h"
 
@@ -29,11 +30,27 @@ int in_max;
 char **out_group;
 int out_size;
 int out_max;
-double cons_thresh;
+double in_cons_thresh;
+double out_cons_thresh;
 char **genome_names;
 int genomes_size;
 int genomes_max;
 hash genomes;
+
+//Define long options, note that options with 'no_argument'
+//specified do require arguments, no_argument specification
+//necessary for reading in variable size list of arguments.
+static struct option long_options[]={
+{"in-thresh",required_argument,0,'x'},
+{"out-thresh",required_argument,0,'z'},
+{"out-group",no_argument,0,'o'},
+{"in-group",no_argument,0,'i'},
+{"output-genomes",no_argument,0,'g'},
+{0,0,0,0}
+  };
+ 
+
+
 
 void free_genome(genome gen){
    if(gen == NULL) return;
@@ -58,6 +75,36 @@ ENTRY *search_hash(char *key, ENTRY *ret_val, hash table){
             exit(1);
          }
          return ret_val;
+}
+
+void clean_up(){
+   free(in_group);
+   free(out_group);
+   ENTRY *gen_val;
+//   ENTRY *scaf_val;
+   scaffold curr_scaf;
+   genome curr_gen;
+   for(int i = 0; i < genomes_size; ++i){
+      gen_val=search_hash(genome_names[i],gen_val,genomes);
+      curr_gen = gen_val->data;
+      for(int j = 0; j < curr_gen->num_scaffolds; ++j){
+         ENTRY *scaf_val;
+         scaf_val = search_hash(curr_gen->scaffold_names[j],
+             scaf_val,curr_gen->scaffolds);
+         curr_scaf = scaf_val->data;
+         free(curr_scaf->sequence);
+         free(curr_scaf);
+         free(scaf_val->key);
+         free(curr_gen->scaffold_names[j]);
+      }
+      free(curr_gen->scaffold_names);
+      hdestroy_r(curr_gen->scaffolds);
+      free(curr_gen->scaffolds);
+      free(curr_gen);
+   }
+   hdestroy_r(genomes);
+   free(genomes);
+   free(genome_names);
 }
 
 
@@ -99,11 +146,12 @@ void parse_args(int argc, char **argv){
       exit(1);
    }
    char c;
-   while((c=getopt(argc,argv,"ciog"))!= -1){
+   int option_index=0;
+   while((c=getopt_long(argc,argv,"x:z:iog",long_options,&option_index))!= -1){
       switch(c){
          case 'i':
             if(argv[optind][0]=='-'){
-               fprintf(stderr, "-i parameter requires at least one argument\n");
+               fprintf(stderr, "--in-group parameter requires at least one argument\n");
                exit(1);
             }
             do{
@@ -118,7 +166,7 @@ void parse_args(int argc, char **argv){
             break;
          case 'o':
             if(argv[optind][0]=='-'){
-               fprintf(stderr, "-o parameter requires at least one argument\n");
+               fprintf(stderr, "--out-group parameter requires at least one argument\n");
                exit(1);
             }
             do{
@@ -133,7 +181,7 @@ void parse_args(int argc, char **argv){
             break;
          case 'g':
             if(argv[optind][0]=='-'){
-               fprintf(stderr, "-g parameter requires at least one argument\n");
+               fprintf(stderr, "--output-genomes parameter requires at least one argument\n");
                exit(1);
             }
             do{
@@ -146,19 +194,31 @@ void parse_args(int argc, char **argv){
                genome_names[genomes_size++]=argv[optind++];
             }while(optind < argc && argv[optind][0]!='-');
             break;
-         case 'c':
-            if(argv[optind][0]=='-'){
-               fprintf(stderr, "-c parameter requires one argument\n");
+         case 'x':
+            if(optarg==NULL || optarg[0]=='-'){
+               fprintf(stderr, "--in-thresh parameter requires one argument\n");
                exit(1);
             }
-            cons_thresh=atof(argv[optind++]);
-            if(cons_thresh<=0 || cons_thresh >1){
-               fprintf(stderr, "Invalid conservation threshold: %g\n",cons_thresh);
+            in_cons_thresh=atof(optarg);
+            if(in_cons_thresh<=0 || in_cons_thresh >1){
+               fprintf(stderr, "Invalid conservation threshold: %g\n",in_cons_thresh);
+               exit(1);
+            }
+            break;
+         case 'z':
+            if(optarg==NULL || optarg[0]=='-'){
+               fprintf(stderr, "--out-thresh parameter requires one argument\n");
+               exit(1);
+            }
+            out_cons_thresh=atof(optarg);
+            if(out_cons_thresh<=0 || out_cons_thresh >1){
+               fprintf(stderr, "Invalid conservation threshold: %g\n",out_cons_thresh);
                exit(1);
             }
             break;
          case '?':
-            fprintf(stderr, "Invalid option: %s\n", argv[optind-1]);
+	   //	   if(optopt == NULL) fprintf(stderr,"Invalid long option: %s\n",argv[optind-1]);
+	   //           else fprintf(stderr, "Invalid short option: %s\n", optopt);
             exit(1);
       }
    }
@@ -201,17 +261,24 @@ void process_block(sorted_alignment_block aln){
             case '-':
                      ++counts[4];
                      break;
+            case 'N':
+                     continue;
             default:
-                    fprintf(stderr,"Nonstandard base encountered: %c\n",c);
-                    return;
+	      //fprintf(stderr,"Nonstandard base encountered: %c\n",c);
+  	      //return;
+                     break;        
          }                   
          ++num_found;
       }  
 //Get highest count found in this position, check if highest count over
 //number of observed bases is below threshold, if so, continue, leaving
 //the already written 0 untouched.
+      if(num_found < 1){
+          cons_string[base]='0';
+          continue;
+      }
       in_score=((double)get_largest(counts,5))/num_found;
-      if(in_score < cons_thresh){
+      if(in_score < in_cons_thresh){
          cons_string[base]='0'; 
          continue;
       }
@@ -237,14 +304,21 @@ void process_block(sorted_alignment_block aln){
             case '-':
                      ++counts[4];
                      break;
+            case 'N':
+                     continue;
             default:
-                    fprintf(stderr,"Nonstandard base encountered: %c\n",c);
-                    return;
+	      //fprintf(stderr,"Nonstandard base encountered: %c\n",c);
+	      //return;
+	      break;
          }
          ++num_found;
       }
+      if(num_found < 1){
+         cons_string[base]='1';
+         continue;
+      }
       out_score=((double)get_largest(counts,5))/num_found;
-      if(out_score < cons_thresh) cons_string[base]='1';
+      if(out_score < out_cons_thresh) cons_string[base]='1';
       else cons_string[base]='2';
    }  
 //Now that we have the completed conservation string, we can add it
@@ -257,24 +331,24 @@ void process_block(sorted_alignment_block aln){
 //If so, get scaffold name and genome struct.
       ret_val=search_hash(aln->in_sequences[itor]->species,ret_val,genomes);
       genome curr_gen = ret_val->data;
-      printf("Scaffold name: %s\n",aln->in_sequences[itor]->scaffold);
 //Check if scaffold is in species genome struct already.
       ret_val=search_hash(aln->in_sequences[itor]->scaffold,ret_val,curr_gen->scaffolds);
 //If ret_val is NULL, need to add entry for this scaffold
       if(ret_val == NULL){
          if(curr_gen->num_scaffolds >= curr_gen->max_scaffolds){
             fprintf(stderr, "WARNING: Scaffold hash table over half full"
-                            "consider increasing max alignment hash size"
+                            " consider increasing max alignment hash size"
                             " to avoid decreased performance or crashes.\n"
                             "Species: %s\nCurrent size: %d\nMax size: %d\n"
                             ,curr_gen->species,curr_gen->num_scaffolds
                             ,curr_gen->max_scaffolds);
          }
-         scaffold new_scaf= malloc(sizeof(struct _scaffold *));
+         scaffold new_scaf= malloc(sizeof(*new_scaf));
          assert(new_scaf != NULL);
          new_scaf->length = aln->in_sequences[itor]->srcSize;
-         new_scaf->sequence =  calloc(1,sizeof(char)*new_scaf->length);
+         new_scaf->sequence =  malloc(new_scaf->length*sizeof(char));
          assert(new_scaf->sequence != NULL);
+         memset(new_scaf->sequence,48,new_scaf->length*sizeof(char));
          ENTRY search={strdup(aln->in_sequences[itor]->scaffold),new_scaf};
 	 assert(search.key != NULL);
          hc=hsearch_r(search,ENTER,&ret_val,curr_gen->scaffolds);
@@ -288,11 +362,43 @@ void process_block(sorted_alignment_block aln){
       }
 //If scaffold entry already present, or after inserting new entry,
 //write to scaffold stream in appropriate position.
+//      print_sequence(aln->in_sequences[itor]);
       unsigned int insert_pos = aln->in_sequences[itor]->start;
-      strcpy(((scaffold)ret_val->data)->sequence+(insert_pos-1),cons_string);
+      memcpy(((scaffold)ret_val->data)->sequence+insert_pos,
+                   cons_string,aln->in_sequences[itor]->size*sizeof(char));
+      int shnarp = 0;
 
    }
 }
+
+void write_genomes(){
+   ENTRY *ret_val;
+   char filename[64];
+   FILE *outfile;
+   for(int i = 0; i < genomes_size; ++i){
+      strcpy(filename,genome_names[i]);
+      strcat(filename,"_conservomatic.fasta");
+      if((outfile= fopen(filename, "w")) == NULL){
+         fprintf(stderr, "Unable to open file: %s\nError: %s",
+            filename,strerror(errno));
+         exit(1);
+      }
+      ret_val=search_hash(genome_names[i], ret_val,genomes);
+      genome curr_gen = ret_val->data;
+      for(int j = 0; j < curr_gen->num_scaffolds; ++j){
+           ret_val=search_hash(curr_gen->scaffold_names[j],ret_val,curr_gen->scaffolds);
+           fprintf(outfile,">%s.%s   ",genome_names[i],ret_val->key);
+           char *sequence = ((scaffold)ret_val->data)->sequence;
+           for(unsigned int k = 0; k < ((scaffold)ret_val->data)->length; ++k){
+              if(k%100==0)fprintf(outfile,"\n");
+              fprintf(outfile,"%c",sequence[k]);
+           }
+           fprintf(outfile,"\n");
+      }
+      fclose(outfile);
+   }
+}
+
 
 void print_genomes(){
    ENTRY *ret_val;
@@ -302,10 +408,10 @@ void print_genomes(){
       genome curr_gen = ret_val->data;
       for(int j = 0; j < curr_gen->num_scaffolds; ++j){
            ret_val=search_hash(curr_gen->scaffold_names[j],ret_val,curr_gen->scaffolds);
-           printf(">%s.%s   \n",genome_names[i],ret_val->key);
+           printf(">%s.%s   ",genome_names[i],ret_val->key);
            char *sequence = ((scaffold)ret_val->data)->sequence;
            for(unsigned int k = 0; k < ((scaffold)ret_val->data)->length; ++k){
-              if(k==100)printf("\n");
+              if(k%100==0)printf("\n");
               printf("%c",sequence[k]);
            }
            printf("\n");
@@ -322,8 +428,12 @@ int main(int argc, char **argv){
    assert(out_group != NULL);
    out_size=0;
    out_max=2;
-   cons_thresh=0;
-        parse_args(argc,argv);
+   in_cons_thresh=0.7;
+   out_cons_thresh=0.7;
+   genome_names = malloc(sizeof(char *)*2);
+   genomes_size=0;
+   genomes_max=2;
+   parse_args(argc,argv);
    if(optind >= argc){
       fprintf(stderr, "Missing required MAF filename\n");
       exit(1);
@@ -335,11 +445,12 @@ int main(int argc, char **argv){
          filename,strerror(errno));
       return 1;
    }
-//   for(int i = 0; i < in_size; ++i) printf("%s\n", in_group[i]);
-//  for(int i = 0; i < out_size; ++i) printf("%s\n", out_group[i]);
-//  for(int i = 0; i < genomes_size; ++i) printf("%s\n", genome_names[i]);
-//   printf("Threshold: %g\n", cons_thresh);
-//   printf("Filename: %s\n",filename);
+   for(int i = 0; i < in_size; ++i) printf("%s\n", in_group[i]);
+   for(int i = 0; i < out_size; ++i) printf("%s\n", out_group[i]);
+   for(int i = 0; i < genomes_size; ++i) printf("%s\n", genome_names[i]);
+   printf("In Group Threshold: %g\n", in_cons_thresh);
+   printf("Out Group Threshold: %g\n", out_cons_thresh);
+   printf("Filename: %s\n",filename);
    genomes = calloc(1,sizeof(struct hsearch_data));
    assert(genomes != NULL);
    int hc = hcreate_r(16,genomes);
@@ -352,13 +463,13 @@ int main(int argc, char **argv){
        genome new_gen = malloc(sizeof(*new_gen));
        assert(new_gen != NULL);
        new_gen->num_scaffolds=0;
-       new_gen->max_scaffolds=128;
-       new_gen->scaffold_names = malloc(sizeof(char*) * 256);
+       new_gen->max_scaffolds=600000;
+       new_gen->scaffold_names = malloc(sizeof(char*) * 2000000);
        assert(new_gen->scaffold_names != NULL);
        new_gen->species = genome_names[i];
        new_gen->scaffolds = calloc(1,sizeof(struct hsearch_data));
        assert(new_gen->scaffolds != NULL);
-       hc = hcreate_r(256,new_gen->scaffolds);
+       hc = hcreate_r(2000000,new_gen->scaffolds);
        if(hc == 0){
           fprintf(stderr,"Failed to create hash table: %s\n", strerror(errno));
           exit(1);
@@ -381,7 +492,8 @@ int main(int argc, char **argv){
       process_block(aln);
       free_sorted_alignment(aln);
    }
-   print_genomes();
+  // print_genomes();
+   write_genomes();
 /*   for(int i = 0; i < genomes_size; ++i){
       printf("For species %s:\n",genome_names[i]);
       ret_val=search_hash(genome_names[i], ret_val,genomes);
@@ -393,6 +505,7 @@ int main(int argc, char **argv){
    }*/
    free_linear_parser(parser);
    fclose(maf_file);
+   clean_up();
    return 0;
 }
 
