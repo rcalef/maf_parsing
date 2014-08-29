@@ -1,0 +1,66 @@
+##
+#
+a
+s       Anc05.Anc05refChr2221   0               22      +       80       -----GCTGCGCAAAGCCATTCATCTC
+s       Anc17.Anc17refChr6361   304599035       27      +       493571999       ctggagctgtgcaaaaTCACCCATCTC
+s       Anc10.Anc10refChr5160   429262838       27      +       491195267       TTGGAGCTGTGCAAAATTACTCATCTC
+s       Anc09.Anc09refChr11820  939748762       27      +       1059948442      TTGGAGCTGTGCAAAATTACTCATCTC
+s       Anc18.Anc18refChr3691   200829684       27      +       474906032       ctggagctgtgcaaaaTCACCCATCTC
+s       Anc07.Anc07refChr944    239027743       27      -       995834639       TTGGGGCTGCACAAAGCCATTTATCTT
+s       Anc15.Anc15refChr448    188616241       27      +       557598454       CTGGAGCTGTGCAAAATTACCCATCTC
+s       Anc14.Anc14refChr2763   96621712        27      +       1070592722      CTGGAGCTGTGCAAAATTACCCATCTC
+s       Anc21.Anc21refChr30149  1363076         27      -       8882446 CTGGAGCTGTGCAAAATTATGCATCTC
+s       croPor2.scaffold-1580   4    27      +       80  TTGGGGCTGCACAAAGCAATTTATCTC
+s       amaVit1.AOCU01257236    53    27      -       80    CTGGAGCTGTGCAAAATTGTCCATCTC
+
+a
+s       Anc05.Anc05refChr2221   22      9       +       80       AGTTTGCCT
+s       Anc17.Anc17refChr6361   304599062       9       +       493571999       AGCATAGAT
+s       Anc10.Anc10refChr5160   429262865       5       +       491195267       AGTT----T
+s       Anc09.Anc09refChr11820  939748789       9       +       1059948442      AGTTAGCAT
+s       Anc18.Anc18refChr3691   200829711       9       +       474906032       AGCATAGAT
+s       Anc07.Anc07refChr944    239027771       9       -       995834639       CATTTGTCT
+s       Anc15.Anc15refChr448    188616268       9       +       557598454       AGTCAGCAT
+s       Anc14.Anc14refChr2763   96621739        9       +       1070592722      AGTTAGCAT
+s       Anc21.Anc21refChr30149  1363103 9       -       8882446 AGTTAGTGT
+s       croPor2.scaffold-1580   0    4       +       80  CATT-----
+s       amaVit1.AOCU01257236    44    9       -       80    AGTCAGCAT
+
+a
+s       Anc05.Anc05refChr2221   31      15      +       80       AGGCTGAACCTAAAA
+s       Anc17.Anc17refChr6361   304599071       11      +       493571999       ----ATTACCTTTAT
+s       Anc10.Anc10refChr5160   429262870       9       +       491195267       AGACTTTAC------
+s       Anc09.Anc09refChr11820  939748798       15      +       1059948442      AGACTTTACCTTTAC
+s       Anc18.Anc18refChr3691   200829720       11      +       474906032       ----ATTACCTTTAT
+s       Anc07.Anc07refChr944    239027780       15      -       995834639       AGGCTGAACCTAAAA
+s       Anc15.Anc15refChr448    188616277       10      +       557598454       AGCCTTTT-----AG
+s       Anc14.Anc14refChr2763   96621748        15      +       1070592722      AGACTTTACCTTTAG
+s       Anc21.Anc21refChr30149  1363112 15      -       8882446 AGACGTTACCTTTAG
+s       croPor2.scaffold-1580   31    15      +       80  AGGCTGAACCTAAAA
+s       amaVit1.AOCU01257236    20    10      -       80    AGCCTTTT-----AG
+
+a
+s       Anc05.Anc05refChr2221   46      20      +       80       GGTACCTGGCTGCACATGAC
+s       Anc17.Anc17refChr6361   304599082       20      +       493571999       GTTACCTGGCTGTATTCATT
+s       Anc10.Anc10refChr5160   429262879       20      +       491195267       GTTACCTGGCTACATTTATT
+s       Anc09.Anc09refChr11820  939748813       20      +       1059948442      GTTACCTGGCTACATTTATT
+s       Anc18.Anc18refChr3691   200829731       20      +       474906032       GTTACCTGGCTGTATTCATT
+s       Anc07.Anc07refChr944    239027795       20      -       995834639       GGTACCTTACTGCACATGAC
+s       Anc14.Anc14refChr2763   96621763        20      +       1070592722      GTTACCTGGCTGCATTTATT
+s       Anc21.Anc21refChr30149  1363127 20      -       8882446 GTTACCTGGATGCATTTATT
+s       croPor2.scaffold-1580   60    20      +       80  GGTACCTTACTGCACATGAC
+s       amaVit1.AOCU01257236    0    20      -       80    GTTACCTGGCCACATTCATC
+
+a
+s       Anc05.Anc05refChr2221   66      14      +       80       AAAGGTGGACATCA
+s       Anc17.Anc17refChr6361   304599106       14      +       493571999       AAATGATGACAAAA
+s       Anc10.Anc10refChr5160   429262899       14      +       491195267       AAATGGGGACAAAA
+s       Anc09.Anc09refChr11820  939748833       14      +       1059948442      AAATGGGGACAAAA
+s       Anc18.Anc18refChr3691   200829755       14      +       474906032       AAATGATGACAAAT
+s       Anc07.Anc07refChr944    239027815       14      -       995834639       AAAGATGGACATCA
+s       Anc15.Anc15refChr448    188616307       14      +       557598454       AAATGAGGACAAAA
+s       Anc14.Anc14refChr2763   96621783        14      +       1070592722      AAATGAGGACAAAA
+s       Anc21.Anc21refChr30149  1363147 14      -       8882446 AAATGAGGACAAAA
+s       croPor2.scaffold-1580   46    14      +       80  AAAGATGGACATCA
+s       amaVit1.AOCU01257236    30    14      -       80    AAATGAAGACATAA
+

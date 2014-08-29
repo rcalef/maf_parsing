@@ -230,6 +230,7 @@ void process_block(sorted_alignment_block aln){
    int itor;
    int hc = 0;
    int num_found;
+   int offset;
    double in_score;
    double out_score;
    ENTRY *ret_val;
@@ -364,10 +365,20 @@ void process_block(sorted_alignment_block aln){
 //write to scaffold stream in appropriate position.
 //      print_sequence(aln->in_sequences[itor]);
       unsigned int insert_pos = aln->in_sequences[itor]->start;
-      memcpy(((scaffold)ret_val->data)->sequence+insert_pos,
-                   cons_string,aln->in_sequences[itor]->size*sizeof(char));
-      int shnarp = 0;
-
+//Only want to copy over the whole conservation string if the aligned
+//sequence for this species doesn't contain gaps, else need to only
+//copy over those numbers that correspond to existing bases.
+      offset=0;
+      if(aln->in_sequences[itor]->size == aln->seq_length)
+            memcpy(((scaffold)ret_val->data)->sequence+insert_pos,
+                   cons_string,aln->seq_length*sizeof(char));
+      else for(int i = 0; i < aln->seq_length; ++i){
+	  if(aln->in_sequences[itor]->sequence[i] != '-'){
+	     memcpy(((scaffold)ret_val->data)->sequence+insert_pos+offset,
+                   cons_string+i,sizeof(char));
+	     ++offset;
+	  }
+      }
    }
 }
 
@@ -488,7 +499,6 @@ int main(int argc, char **argv){
       sorted_alignment_block aln = get_sorted_alignment(parser,in_group
                   ,in_size,out_group,out_size);
       if(aln==NULL)break;
-      print_sorted_alignment(aln);
       process_block(aln);
       free_sorted_alignment(aln);
    }

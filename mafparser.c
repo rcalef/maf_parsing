@@ -33,6 +33,8 @@ int get_next_offset(maf_array_parser parser) {
 void free_sequence(seq sequence){
    if(sequence==NULL) return;
    free(sequence->src);
+//BUT WHY
+   if(sequence->sequence != NULL && sequence->sequence[0]!= '\0')
    free(sequence->sequence);
    free(sequence->species);
 //   free(sequence->scaffold);
@@ -248,6 +250,7 @@ sorted_alignment_block get_sorted_alignment(maf_linear_parser parser,
    long bytesread;
    int sizeLeftover=0;
    int bLoopCompleted = 0;
+   int first = 1;
    char *datum;
    char *npos;
    char *temp;
@@ -307,6 +310,7 @@ sorted_alignment_block get_sorted_alignment(maf_linear_parser parser,
          new_align->out_size=0;
          new_align->out_max=16;
          new_align->data = NULL;
+         new_align->seq_length=0;
          in_block=1;
          continue;
       }
@@ -318,6 +322,10 @@ sorted_alignment_block get_sorted_alignment(maf_linear_parser parser,
          if(new_seq == NULL){
            fprintf(stderr, "Invalid sequence entry %s\n",datum);
            return NULL;
+         }
+         if(first){
+            new_align->seq_length=strlen(new_seq->sequence);
+            first = 0;
          }
          temp = strdup(new_seq->src);
          assert(temp != NULL);
@@ -469,6 +477,7 @@ alignment_block linear_next_alignment_buffer(maf_linear_parser parser){
    char *datum;
    int init=1;
    char *npos;
+   int first=1;
    do{
       if(parser->fill_buf){
          bytesread = fread(parser->buf+sizeLeftover, 1, 
@@ -532,6 +541,10 @@ alignment_block linear_next_alignment_buffer(maf_linear_parser parser){
          if(new_seq == NULL){
            fprintf(stderr, "Invalid sequence entry %s\n",datum);
            return NULL;
+         }
+         if(first){
+            new_align->seq_length=strlen(new_seq->sequence);
+            first = 0;
          }
          if(new_align->size ==new_align->max){
              new_align->sequences=realloc(new_align->sequences,
@@ -630,6 +643,7 @@ maf_linear_parser get_linear_parser(FILE *maf_file, char *filename){
 	assert(filename!=NULL);
         parser->curr_pos=0;
         parser->fill_buf=1;
+	parser->pos=0;
 	return parser;
 }
 
@@ -682,8 +696,8 @@ void free_array_parser(maf_array_parser parser){
 }
 void print_sequence(seq sequence){
    if(sequence==NULL) return;
-   printf("s %s.%s  %lu  %u  %c  %lu  %s\n"
-      ,sequence->species,sequence->scaffold,sequence->start,sequence->size
+   printf("s %25s  %18lu  %8u  %c  %18lu  %s\n"
+      ,sequence->src,sequence->start,sequence->size
       ,sequence->strand,sequence->srcSize,sequence->sequence);
 }
 void print_alignment(alignment_block aln){
