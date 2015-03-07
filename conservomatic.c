@@ -347,8 +347,8 @@ thresholds check_uninformative_block(sorted_alignment_block aln){
    unsigned int itor = 0;
    unsigned int num_in_species = 0;
    unsigned int num_out_species = 0;
-   double in_species_proportion = 0.0;
-   double out_species_proportion = 0.0;
+   float in_species_proportion = 0.0;
+   float out_species_proportion = 0.0;
    float new_in_thresh = 0.0;
    float new_out_thresh = 0.0;
    ENTRY *ret_val;
@@ -411,7 +411,9 @@ thresholds check_uninformative_block(sorted_alignment_block aln){
    out_species_proportion = num_out_species/(float)out_size;
    printf("Num out species seen: %d\n Out group species: %d\nOut group proportion: %g\n",
       num_out_species,out_size,out_species_proportion);
-   if(out_species_proportion < out_cons_thresh) return NULL;
+   //If out_species are 
+   if(1 - out_species_proportion >= out_cons_thresh) new_out_thresh = -1;
+   else if(out_species_proportion < out_cons_thresh) new_out_thresh = 2;
    new_out_thresh = (1 + out_cons_thresh) - out_species_proportion;
 
 
@@ -452,7 +454,7 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
    //built up one position at a time.
    char c;
    char cons_string[aln->seq_length];
-   thresh->in_thresh = 0.8;
+   //thresh->in_thresh = 0.8;
    printf("Thresholds: %g %g\n",thresh->in_thresh,thresh->out_thresh);
    //Check conservation base by base, starting with in group species.
    for(unsigned int base = 0; base < aln->seq_length; ++base){
@@ -504,8 +506,11 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
           cons_string[base]='0';
           continue;
       }
+//********************************************************************
+//Potential for rounding error here
+//********************************************************************
       in_base=get_largest_index(counts,5);
-      in_score=((double)counts[in_base])/num_found;
+      in_score=((float)counts[in_base])/num_found;
       printf("%g\n",in_score);
       if(in_score < thresh->in_thresh){
          printf("In score below thresh\n");
@@ -559,7 +564,7 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
       out_base=get_largest_index(counts,5);
       if(in_base != out_base) cons_string[base]='1';
       else{
-         out_score=((double)counts[out_base])/num_found;
+         out_score=((float)counts[out_base])/num_found;
          if(out_score < thresh->out_thresh) cons_string[base]='1';
          else cons_string[base]='2';
       }
