@@ -66,6 +66,7 @@ char **genome_names;
 int genomes_size;
 int genomes_max;
 hash genomes;
+FILE *filtered_blocks;
 
 //Define long options, note that options with 'no_argument'
 //specified do require arguments, the 'no_argument' specification
@@ -157,6 +158,7 @@ void clean_up(){
    hdestroy_r(genomes);
    free(genomes);
    free(genome_names);
+   fclose(filtered_blocks);
 }
 
 /*
@@ -382,7 +384,10 @@ thresholds check_uninformative_block(sorted_alignment_block aln){
       }
       ++num_in_species;
    }
-
+   if(num_in_species < 3){
+      print_sorted_alignment_file(filtered_blocks,aln);
+      return NULL;
+   }
    for(itor = 0;itor < aln->out_size; ++itor){
       ret_val = search_hash(aln->out_sequences[itor]->species,
          ret_val,out_group_species);
@@ -402,18 +407,13 @@ thresholds check_uninformative_block(sorted_alignment_block aln){
    free(out_group_species);
 
    in_species_proportion = num_in_species/(float)in_size;
-   printf("Num in species seen: %d\n In group species: %d\nIn group proportion: %g\n",
-      num_in_species,in_size,in_species_proportion);
    if(in_species_proportion < in_cons_thresh) return NULL;
    new_in_thresh = (1 + in_cons_thresh) - in_species_proportion;
 
 
    out_species_proportion = num_out_species/(float)out_size;
-   printf("Num out species seen: %d\n Out group species: %d\nOut group proportion: %g\n",
-      num_out_species,out_size,out_species_proportion);
    //If out_species are 
-   if(1 - out_species_proportion >= out_cons_thresh) new_out_thresh = -1;
-   else if(out_species_proportion < out_cons_thresh) new_out_thresh = 2;
+   if(out_species_proportion < out_cons_thresh) new_out_thresh = -1;
    new_out_thresh = (1 + out_cons_thresh) - out_species_proportion;
 
 
@@ -454,8 +454,6 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
    //built up one position at a time.
    char c;
    char cons_string[aln->seq_length];
-   //thresh->in_thresh = 0.8;
-   printf("Thresholds: %g %g\n",thresh->in_thresh,thresh->out_thresh);
    //Check conservation base by base, starting with in group species.
    for(unsigned int base = 0; base < aln->seq_length; ++base){
       //Need to reset the various variables used, particularly setting counts to 0
@@ -498,22 +496,22 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
       //alignment blocks with no in-group species, which shouldn't happen
       //given that the alignment is archosaur referenced.
 
-      //Get highest count found in this position, check if highest count over
-      //number of observed bases is below threshold, if so, continue, leaving
-      //the already written 0 untouched.
+      //5/24/15: This check should be redundant now due to new function
+      //check_uninformative_block
+
       if(num_found < 1){
-          printf("Not enough found\n");
           cons_string[base]='0';
           continue;
       }
 //********************************************************************
 //Potential for rounding error here
 //********************************************************************
+      //Get highest count found in this position, check if highest count over
+      //number of observed bases is below threshold, if so, continue, leaving
+      //the already written 0 untouched.
       in_base=get_largest_index(counts,5);
       in_score=((float)counts[in_base])/num_found;
-      printf("%g\n",in_score);
       if(in_score < thresh->in_thresh){
-         printf("In score below thresh\n");
          cons_string[base]='0'; 
          continue;
       }
@@ -561,7 +559,8 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
       //base in the in-group, mark as in-group conserved. If bases are the same
       //then check if out-group conservation is above threshold, and mark base
       //as 1 if not, or 2 if so (conserved in both in-group and out-group)
-      out_base=get_largest_index(counts,5);
+      if(thresh->out_thresh == -1) out_base = 4;
+      else out_base=get_largest_index(counts,5);
       if(in_base != out_base) cons_string[base]='1';
       else{
          out_score=((float)counts[out_base])/num_found;
@@ -586,39 +585,6 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
       //Check if scaffold is in species genome struct already, if not, then
       //we need to add a new scaffold struct.
       ret_val=search_hash(aln->in_sequences[itor]->scaffold,ret_val,curr_gen->scaffolds);
-/*
-      if(ret_val == NULL){
-         //Must print warning if hash table begins to fill up, as the
-         //C library hashing functions don't allow resizing the hash table.
-         if(curr_gen->num_scaffolds >= curr_gen->max_scaffolds){
-            fprintf(stderr, "WARNING: Scaffold hash table over half full"
-                            " consider increasing max alignment hash size"
-                            " to avoid decreased performance or crashes.\n"
-                            "Species: %s\nCurrent size: %d\nMax size: %d\n"
-                            ,curr_gen->species,curr_gen->num_scaffolds
-                            ,curr_gen->max_scaffolds);
-         }
-         scaffold new_scaf= malloc(sizeof(*new_scaf));
-         assert(new_scaf != NULL);
-         new_scaf->length = aln->in_sequences[itor]->srcSize;
-         new_scaf->sequence =  malloc(new_scaf->length*sizeof(char));
-         assert(new_scaf->sequence != NULL);
-         //When adding in a new scaffold, need to set the whole sequence to
-         //0, corresponding to no information at unseen positions. Actually
-         //needs to be the character 0, hence memset'ing to 48
-         memset(new_scaf->sequence,48,new_scaf->length*sizeof(char));
-         ENTRY search={strdup(aln->in_sequences[itor]->scaffold),new_scaf};
-	 assert(search.key != NULL);
-         hc=hsearch_r(search,ENTER,&ret_val,curr_gen->scaffolds);
-         if(hc == 0){
-            fprintf(stderr,"Error inserting into hash table: %s\n", strerror(errno));
-            exit(1);
-         }
-         curr_gen->scaffold_names[curr_gen->num_scaffolds++]=
-               strdup(aln->in_sequences[itor]->scaffold);
-         assert(curr_gen->scaffold_names[curr_gen->num_scaffolds-1] != NULL);
-      }
-*/
       //If scaffold entry already present, or after inserting new entry,
       //write to scaffold stream in appropriate position.
       
@@ -629,9 +595,6 @@ void process_block(sorted_alignment_block aln, thresholds thresh){
       offset=0;
       //If the size of the sequence for this species is the same as the longest
       //sequence length, then just copy over the whole conservation string.
-//*****************************************************************************
-      //CHECK FOR CORRECTNESS 
-//*****************************************************************************
       if(aln->in_sequences[itor]->size == aln->seq_length)
             memcpy(((scaffold)ret_val->data)->sequence+insert_pos,
                    cons_string,aln->seq_length*sizeof(char));
@@ -773,7 +736,11 @@ void set_up(){
       fprintf(stderr,"Failed to create hash table: %s\n", strerror(errno));
       exit(1);
    }
-
+   if((filtered_blocks = fopen("filtered_blocks.maf","w")) == NULL){
+      fprintf(stderr, "Unable to open file: filtered_blocks.maf\nError: %s",
+         strerror(errno));
+      exit(1);
+   }
 }
 
 int main(int argc, char **argv){
@@ -844,7 +811,7 @@ int main(int argc, char **argv){
       sorted_alignment_block aln = get_sorted_alignment(parser,in_group
                   ,in_size,out_group,out_size);
       //Parser returns NULL on EOF
-      if(aln==NULL)break;
+      if(aln==NULL) break;
       thresh = check_uninformative_block(aln);
       if(thresh == NULL){
          free_sorted_alignment(aln);
