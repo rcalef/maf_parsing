@@ -249,7 +249,7 @@ char **get_tree_sequences(){
       curr_scaf = ones_positions[i];
       current_pos = 0;
 //      strcpy(filename,"birdRepAnc05.");
-      strcpy(filename,"../split_maf/birdRepAnc05.");
+      strcpy(filename,"/projects/redser/ftp/100way_alignment/split_maf/birdRepAnc05.");
       strcat(filename,curr_scaf->scaf_name);
       strcat(filename,"-blocks_only.maf");
       if((curr_scaf_maf = fopen(filename,"r")) == NULL){
@@ -261,6 +261,7 @@ char **get_tree_sequences(){
       while(1){
          aln = get_sorted_alignment(scaf_parser,tree_species_names,
             tree_species_size, NULL,0);
+         if(aln == NULL) break;
          aln_position = 0;
          for(int j = 0; j < aln->in_size; ++j){
 //            if(strcmp(aln->in_sequences[j]->species,"birdRepAnc05") == 0){

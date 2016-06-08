@@ -128,73 +128,7 @@ void parse_args(int argc, char **argv){
    }
 }
 
-/*
-void process_bed(FILE *bed_file){
-   char buffer[1024];
-   char *scaf_name = NULL;
-   char *curr_scaf_name = "";
-   scaf_positions curr_scaf = NULL;
-   unsigned int i = 0;
-   unsigned int start = 0;
-   unsigned int end = 0;
-   unsigned int num_positions = 0;
-   unsigned int max_positions = 128;
-   unsigned int *positions = malloc(sizeof(unsigned int) * 128);
-   assert(positions != NULL);
-   while(fgets(buffer,1024,bed_file) != NULL){
-      scaf_name = strtok(buffer,"\t");
-      if(strcmp(scaf_name,curr_scaf_name) != 0){
-         if(curr_scaf != NULL){
-            curr_scaf->num_positions = num_positions;
-            curr_scaf->max_positions = max_positions;
-            curr_scaf->positions = positions;
-            curr_scaf->scaf_name = curr_scaf_name;
-            num_positions = 0;
-            max_positions = 128;
-            positions = malloc(sizeof(unsigned int) * 128);
-            assert(positions != NULL);
-            if(num_scafs >= max_scafs){
-               max_scafs *=2;
-               ones_positions = realloc(ones_positions,
-                  sizeof(struct _scaffold_positions) * max_scafs);
-               assert(ones_positions != NULL);
-            }
-            ones_positions[num_scafs++] = curr_scaf;
-         }
-         //Need to store current scaffold and start a new one
-         curr_scaf = malloc(sizeof(struct _scaffold_positions));
-         assert(curr_scaf != NULL);
-         curr_scaf_name = strdup(scaf_name);
-         assert(curr_scaf_name != NULL);
-      }
-      start = atoi(strtok(NULL,"\t"));
-      end = atoi(strtok(NULL,"\t"));
-      num_columns += (end - start);
-      for(i = start; i < end; ++i){
-         if(num_positions >= max_positions){
-            max_positions *=2;
-            positions = realloc(positions,
-               sizeof(unsigned int) * max_positions);
-            assert(ones_positions != NULL);
-         }
-         positions[num_positions++] = i;
-      }
-   }
-   if(curr_scaf != NULL){
-      curr_scaf->num_positions = num_positions;
-      curr_scaf->max_positions = max_positions;
-      curr_scaf->positions = positions;
-      curr_scaf->scaf_name = curr_scaf_name;
-      if(num_scafs >= max_scafs){
-         max_scafs *=2;
-         ones_positions = realloc(ones_positions,
-            sizeof(struct _scaffold_positions) * max_scafs);
-         assert(ones_positions != NULL);
-      }
-      ones_positions[num_scafs++] = curr_scaf;
-   }
-}
-*/
+
 read_positions cigar_to_positions(char *cigar, unsigned int start,char *sequence){
    unsigned int i = 0;
    unsigned int num_bases = 0;
@@ -312,7 +246,7 @@ void single_read_region(read_positions read){
          filename,strerror(errno));
       exit(1);
    }
-   strcpy(filename,"../split_maf/birdRepAnc05.");
+   strcpy(filename,"/projects/redser/ftp/100way_alignment/split_maf/birdRepAnc05.");
    strcat(filename,read->scaf_name);
    strcat(filename,"-blocks_only.maf");
    if((curr_scaf_maf = fopen(filename,"r")) == NULL){
@@ -434,105 +368,7 @@ void process_bed_complete(FILE *bed_file){
    }
 }
 
-/*
-char **get_read_regions(){
-   int i = 0;
-   char filename[128];
-   FILE *curr_scaf_maf = NULL;
-   maf_linear_parser scaf_parser = NULL;
-   sorted_alignment_block aln = NULL;
-   scaf_positions curr_scaf = NULL;
-   seq reference_seq = NULL;
-   unsigned int current_column = 0;
-   unsigned int aln_position = 0;
-   unsigned int ref_position = 0;
-   unsigned int current_pos = 0;
-   unsigned int end_range = 0;
-   char **multiple_aln = malloc(sizeof(char *) * tree_species_size);
-   assert(multiple_aln != NULL);
-   FILE *maf_output;
-   if((maf_output= fopen("mapped_alignments.maf", "w")) == NULL){
-      fprintf(stderr, "Unable to open file: %s\nError: %s\n",
-         filename,strerror(errno));
-      exit(1);
-   }
-   for(i = 0; i < tree_species_size; ++i){
-      multiple_aln[i] = malloc(sizeof(char) * (num_columns+1));
-      assert(multiple_aln[i] != NULL);
-      memset(multiple_aln[i],45,num_columns);
-      memset(multiple_aln[i] + num_columns,0,1);
-   }
-   for(i = 0; i < num_scafs; ++i){
-      curr_scaf = ones_positions[i];
-      current_pos = 0;
-//      strcpy(filename,"birdRepAnc05.");
-      strcpy(filename,"../split_maf/birdRepAnc05.");
-      strcat(filename,curr_scaf->scaf_name);
-      strcat(filename,"-blocks_only.maf");
-      if((curr_scaf_maf = fopen(filename,"r")) == NULL){
-         fprintf(stderr, "Unable to open file: %s\nError: %s\n",
-            filename,strerror(errno));
-         exit(1);
-      }
-      scaf_parser = get_linear_parser(curr_scaf_maf,filename);
-      while(1){
-         aln = get_sorted_alignment(scaf_parser,tree_species_names,
-            tree_species_size, NULL,0);
-         aln_position = 0;
-         for(int j = 0; j < aln->in_size; ++j){
-//            if(strcmp(aln->in_sequences[j]->species,"birdRepAnc05") == 0){
-            if(strcmp(aln->in_sequences[j]->species,"birdRepAnc05") == 0){
-               reference_seq = aln->in_sequences[j];
-               break;
-            }
-         }
-         ref_position = reference_seq->start;
-         end_range = ref_position + reference_seq->size;
-         if(curr_scaf->positions[current_pos] >= end_range) continue;
-         print_sorted_alignment_file(maf_output,aln);
-         while(1){
-            if(current_pos >= curr_scaf->num_positions){
-               free_sorted_alignment(aln);
-               goto next_scaf;   
-            }
-            if(curr_scaf->positions[current_pos] >= end_range) break;
-            for(int j = aln_position; j < aln->seq_length; ++j){
-               if(reference_seq->sequence[j] != '-'){
-                  if(ref_position == curr_scaf->positions[current_pos]){
-                     aln_position = j;
-                     break;
-                  }
-                  ++ref_position;
-               }
-            }
-            fprintf(stderr,"Position %u in scaffold %s found in alignment column %d\n",
-               curr_scaf->positions[current_pos],curr_scaf->scaf_name,aln_position);
-            for(int j = 0; j < aln->in_size; ++j){
-               for(int k = 0; k < tree_species_size; ++k){
-                  if(strcmp(aln->in_sequences[j]->species,
-                     tree_species_names[k]) !=0) continue;
-//                  if(strcmp(aln->in_sequences[j]->scaffold,
-//                     curr_scaf->scaf_name) != 0) continue;
-                  multiple_aln[k][current_column] = aln->in_sequences[j]->sequence[aln_position];
-                  fprintf(stderr,"%s\t%c\n",tree_species_names[k],aln->in_sequences[j]->sequence[aln_position]);
-               }
-            }
-            ++current_pos;
-            ++current_column;
-            if(current_column >= num_columns) break;
-         }
-         free_sorted_alignment(aln);
-         if(current_column >= num_columns) break;
-         if(current_pos >= curr_scaf->num_positions) break;
-      }
-      next_scaf:
-      free_linear_parser(scaf_parser);
-      fclose(curr_scaf_maf);
-   }
-   fclose(maf_output);
-   return multiple_aln; 
-}
-*/
+
 
 void set_up(){
    tree_species_size=0;
@@ -541,8 +377,6 @@ void set_up(){
 }
 
 void print_multiple_aln(char ** multiple_aln){
-//   for(int i = 0; i < tree_species_size; ++i)
-//      printf("%s\t%s\n", tree_species_names[i],multiple_aln[i]);
    for(int i = 0; i < tree_species_size; ++i)
       printf(">%s\n%s\n", tree_species_names[i],multiple_aln[i]);
 }
@@ -566,17 +400,6 @@ int main(int argc, char **argv){
    fprintf(stderr,"Filename: %s\n",filename);
    fprintf(stderr,"Num tree species: %d\n",tree_species_size);
    process_bed_complete(bed_file);
-//   for(i = 0; i < num_scafs; ++i){
-//      printf("%s\n",ones_positions[i]->scaf_name);
-//      for(int j = 0; j < ones_positions[i]->num_positions; ++j)
-//         printf("%u ",ones_positions[i]->positions[j]);
-//   }
-//   char ** multiple_aln = get_read_regions();
-//   for(i = 0; i < tree_species_size; ++i){
-//      printf(">%s\n%s\n", tree_species_names[i],multiple_aln[i]);
-//      free(multiple_aln[i]);
-//   }
-//   free(multiple_aln);
    fclose(bed_file);
    clean_up();
    return 0;
